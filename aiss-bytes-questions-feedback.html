@@ -274,7 +274,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
       <span id="modState" class="label"></span>
       <button class="mod-ghost" id="modLock" type="button">Lock</button>
     </div>
-    <p class="mod-sub" id="modSub">Every question is in the live feed straight away. When the speaker hides the questions panel, only the “Ask now” questions you send to the speaker pop up on the slides, for up to a minute. “Remove from speaker's screen” closes a pop-up early. Hide removes a question for everyone.</p>
+    <p class="mod-sub" id="modSub">Every question is in the live feed straight away. When the speaker hides the questions panel, only the questions you send to the speaker pop up on the slides, for up to a minute. “Remove from speaker's screen” closes a pop-up early. Hide removes a question for everyone.</p>
     <div class="mod-tabs" role="tablist">
       <button type="button" role="tab" data-tab="plain" class="on">New<b id="cPlain">0</b></button>
       <button type="button" role="tab" data-tab="pushed">Sent to speaker<b id="cPushed">0</b></button>
@@ -298,7 +298,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
 
   <header class="hero">
     <h1 class="mark"><span class="w b">AISS</span> <span class="w">Bytes</span></h1>
-    <p class="tagline"><strong>Ask the speaker.</strong> Send your question now, or save it for the end of the talk.</p>
+    <p class="tagline"><strong>Ask the speaker.</strong> Your question appears in the live feed straight away.</p>
   </header>
 
   <section class="react" id="react" aria-labelledby="reactTitle">
@@ -315,22 +315,13 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
 
   <form id="ask" class="ask" novalidate>
     <h2>Your question</h2>
-    <fieldset class="timing">
-      <legend class="label">When should the speaker see it?</legend>
-      <div class="opts">
-        <label class="opt now on" id="optNow"><input type="radio" name="when" value="now" checked><span class="tick" aria-hidden="true"></span>
-          <span><strong>Ask now</strong><span class="sub">Appears right away, and the speaker can see it during the talk.</span></span></label>
-        <label class="opt end" id="optEnd"><input type="radio" name="when" value="end"><span class="tick" aria-hidden="true"></span>
-          <span><strong>At the end</strong><span class="sub">Held back, then shown with all end-of-talk questions together.</span></span></label>
-      </div>
-    </fieldset>
     <label class="field"><span class="label">Question</span>
       <textarea id="question" maxlength="500" placeholder="Type your question for the speaker"></textarea>
     </label>
     <div class="send-row">
       <div class="send-right">
         <span id="counter" class="counter">0 / 500</span>
-        <button id="send" class="btn" type="submit">Send now</button>
+        <button id="send" class="btn" type="submit">Send</button>
       </div>
     </div>
     <div id="flash" role="status" aria-live="polite"></div>
@@ -343,17 +334,11 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     </div>
 
     <div class="part now" aria-labelledby="nowTitle">
-      <div class="part-head"><h3 id="nowTitle">During the talk</h3><span class="tag now">Ask now</span></div>
+      <div class="part-head"><h3 id="nowTitle">Live questions</h3></div>
       <p id="nowEmpty" class="quiet-note">Loading questions…</p>
       <ol id="nowList" class="thread"></ol>
     </div>
 
-    <div class="part end" aria-labelledby="endTitle">
-      <div class="part-head"><h3 id="endTitle">At the end of the talk</h3><span id="endTag" class="tag wait">Held until the end</span></div>
-      <div id="waiting" class="waiting" hidden><span id="waitN" class="n">0</span><p id="waitText"></p></div>
-      <p id="endEmpty" class="quiet-note" hidden></p>
-      <ol id="endList" class="thread"></ol>
-    </div>
   </section>
 
   <footer class="foot">
@@ -431,8 +416,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
   function draw() {
     var d = S.data || { questions: [], waiting: 0, released: false };
     var qs = d.questions || [];
-    var now = qs.filter(function (q) { return q.when !== "end"; }).sort(function (a, b) { return b.at - a.at; });   // live feed: newest first
-    var end = qs.filter(function (q) { return q.when === "end"; }).sort(function (a, b) { return a.at - b.at; });   // in the order asked
+    var now = qs.slice().sort(function (a, b) { return b.at - a.at; });   // live feed: newest first
     // A question that arrives after the page loaded glows briefly. The time it first appeared is kept,
     // so the glow carries on smoothly when the list is redrawn by the next refresh.
     var first = !S.hadData, burst = 0, nowMs = Date.now();
@@ -463,9 +447,8 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
           q.held ? h("p", { class: "held-note", text: "Held until the end of the talk. Only you can see it for now." }) : null));
     }
 
-    var nowList = $("nowList"), endList = $("endList");
+    var nowList = $("nowList");
     nowList.replaceChildren.apply(nowList, now.map(bubble));
-    endList.replaceChildren.apply(endList, end.map(bubble));
     if (S.loaded) S.hadData = true;
 
     // During the talk: empty and error states.
@@ -475,29 +458,13 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
       : !S.loaded ? (S.failed ? "Couldn't load the questions. Check your connection; the page keeps trying." : "Loading questions…")
       : "No questions yet. Ask the first one above.";
 
-    // At the end: a counter while held, the questions once released.
-    var waiting = d.released ? 0 : (d.waiting || 0);
-    $("waiting").hidden = !S.loaded || d.released || waiting === 0;
-    $("waitN").textContent = String(waiting);
-    $("waitText").replaceChildren(
-      h("strong", { text: waiting === 1 ? "question is waiting" : "questions are waiting" }),
-      document.createTextNode(" for the end of the talk. They appear here all together when the speaker finishes."));
-    var endEmpty = $("endEmpty");
-    endEmpty.hidden = !S.loaded || waiting > 0 || end.length > 0;
-    endEmpty.textContent = d.released ? "No questions were saved for the end." : "Questions marked “At the end” wait here and appear all together when the speaker finishes.";
-    var tag = $("endTag");
-    tag.className = "tag " + (d.released ? "end" : "wait");
-    tag.textContent = d.released ? "Released" : "Held until the end";
-
-    // Live counts: questions during the talk, and for the end (held or shown).
-    var endCount = d.released ? end.length : waiting, live = $("live"), ok = S.loaded && !S.failed;
+    var live = $("live"), ok = S.loaded && !S.failed;
     live.className = "live" + (ok ? "" : " off");
     var state = h("span", { class: "stat" }, h("span", { class: "dot", "aria-hidden": "true" }),
       document.createTextNode(ok ? "live" : !S.loaded ? (S.failed ? "Offline" : "Connecting") : "Reconnecting"));
     if (!S.loaded) live.replaceChildren(state);
     else live.replaceChildren(
-      h("span", { class: "stat now" }, h("b", { text: String(now.length) }), document.createTextNode(" during the talk")),
-      h("span", { class: "stat end" }, h("b", { text: String(endCount) }), document.createTextNode(" for the end")),
+      h("span", { class: "stat now" }, h("b", { text: String(now.length) }), document.createTextNode(now.length === 1 ? " question" : " questions")),
       state);
 
     $("send").disabled = S.busy;
@@ -505,21 +472,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
   }
 
   /* ---- asking ---- */
-  function when() { return document.querySelector('input[name="when"]:checked').value; }
-  function sendLabel() {
-    var end = when() === "end";
-    $("send").classList.toggle("end", end);
-    $("send").textContent = S.busy ? "Sending…" : end ? "Save for the end" : "Send now";
-  }
-  function markOpts() {
-    var end = when() === "end";
-    $("optNow").classList.toggle("on", !end);
-    $("optEnd").classList.toggle("on", end);
-    $("ask").classList.toggle("end", end);
-    sendLabel();
-    remember("when", when());
-  }
-  [].forEach.call(document.querySelectorAll('input[name="when"]'), function (r) { r.addEventListener("change", markOpts); });
+  function sendLabel() { $("send").textContent = S.busy ? "Sending…" : "Send"; }
 
   function count() {
     var n = $("question").value.length, c = $("counter");
@@ -536,7 +489,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     ev.preventDefault();
     if (S.busy) return;
     if (!CONFIG.API_URL) { flash("Questions aren't connected yet.", "err"); return; }
-    var question = $("question").value.trim(), timing = when();
+    var question = $("question").value.trim();
     if (!question) {
       flash(ERRORS.question_required, "err");
       var box = $("ask"); box.classList.remove("shake"); void box.offsetWidth; box.classList.add("shake");
@@ -544,11 +497,11 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
       return;
     }
     S.busy = true; flash(""); draw();
-    send({ action: "ask", question: question, when: timing }).then(function (d) {
+    send({ action: "ask", question: question, when: "now" }).then(function (d) {
       if (d.ok) {
         $("question").value = ""; count();
         var as = d.shownAs ? " You appear as " + d.shownAs.emoji + " " + d.shownAs.alias + "." : "";
-        flash((timing === "end" ? "Saved for the end of the talk." : "Question sent.") + as, "ok");
+        flash("Question sent." + as, "ok");
       } else flash(ERRORS[d.error] || ("Couldn't send" + (d.detail ? " (" + d.detail + ")" : "") + ". Try again."), "err");
     }).catch(function () {
       flash("Couldn't reach the questions sheet. Check your connection and try again.", "err");
@@ -614,8 +567,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
   $("vDisagree").addEventListener("click", function () { vote("disagree"); });
 
   /* ---- start ---- */
-  if (recall("when") === "end") { document.querySelector('input[value="end"]').checked = true; }
-  markOpts();
+  sendLabel();
   $("today").textContent = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
   $("contact").textContent = CONFIG.CONTACT || "";
   count();
@@ -686,7 +638,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     if (!M.data) return;
     var tabOf = function (q) { return q.state === "answered" ? "plain" : q.state; };
     var qs = M.data.questions || [], c = { plain: 0, pushed: 0, hidden: 0 }, fresh = 0;
-    qs.forEach(function (q) { c[tabOf(q)]++; if (q.state === "plain" && q.when !== "end") fresh++; });
+    qs.forEach(function (q) { c[tabOf(q)]++; if (q.state === "plain") fresh++; });
     $("cPlain").textContent = c.plain; $("cPushed").textContent = c.pushed; $("cHidden").textContent = c.hidden;
     [].forEach.call(document.querySelectorAll(".mod-tabs button"), function (b) {
       b.classList.toggle("on", b.getAttribute("data-tab") === M.tab);
@@ -700,16 +652,15 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     var list = $("modList");
     list.replaceChildren.apply(list, rows.map(function (q) {
       var acts = [];
-      if (q.state === "plain" && q.when !== "end") acts.push(h("button", { class: "push", type: "button", text: "Send to speaker", onclick: function () { moderate(q, "pushed"); } }));
+      if (q.state === "plain") acts.push(h("button", { class: "push", type: "button", text: "Send to speaker", onclick: function () { moderate(q, "pushed"); } }));
       if (q.state === "pushed") acts.push(h("button", { class: "back", type: "button", text: "Remove from speaker's screen", onclick: function () { moderate(q, "plain"); } }));
       if (q.state === "hidden") acts.push(h("button", { class: "ok", type: "button", text: "Unhide", onclick: function () { moderate(q, "plain"); } }));
       else acts.push(h("button", { class: "no", type: "button", text: "Hide", onclick: function () { moderate(q, "hidden"); } }));
-      return h("li", { class: "mi " + (q.when === "end" ? "end" : "now") + (M.busy[q.id] ? " busy" : "") },
+      return h("li", { class: "mi now" + (M.busy[q.id] ? " busy" : "") },
         h("div", { class: "mi-top" },
           h("span", { class: "em", "aria-hidden": "true", text: q.emoji || "🙂" }),
           h("span", { class: "who", text: q.alias || "A guest" }),
           h("span", { class: "when", text: q.time || "" }),
-          h("span", { class: "tag " + (q.when === "end" ? "end" : "now"), text: q.when === "end" ? "At the end" : "Ask now" }),
           q.state === "answered" ? h("span", { class: "tag", text: "Answered" }) : null),
         h("p", { class: "mi-q", text: q.question }),
         h.apply(null, ["div", { class: "mi-acts" }].concat(acts)));

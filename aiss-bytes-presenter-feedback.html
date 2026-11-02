@@ -161,9 +161,8 @@ button { font: inherit; color: inherit; }
 .live .dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--live); margin-right: 0.45rem; }
 .live.off .dot { background: var(--line); }
 
-/* The during-the-talk list fills the panel; the end-of-talk questions wait in a drawer
-   whose amber tab sits at the bottom and slides up over the list when pushed. */
-.sheets { position: relative; flex: 1; min-height: 0; overflow: hidden; --tab-h: 4.4rem; }
+/* The list of live questions fills the panel. */
+.sheets { position: relative; flex: 1; min-height: 0; overflow: hidden; --tab-h: 0px; }
 .layer { position: absolute; inset: 0 0 var(--tab-h) 0; display: flex; flex-direction: column; }
 .layer-head { flex: none; display: flex; align-items: center; gap: 0.65rem; padding: 0.8rem 1.1rem 0.7rem; border-top: 4px solid var(--blue); }
 .layer-head h2 { flex: 1; font-family: var(--display); font-weight: 700; font-size: 1.1875rem; line-height: 1.2; }
@@ -171,22 +170,11 @@ button { font: inherit; color: inherit; }
 .badge.now { background: var(--blue); color: #FFFFFF; }
 .badge.end { background: var(--ink); color: var(--amber); }
 
-.drawer { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--amber-soft); transform: translateY(calc(100% - var(--tab-h))); box-shadow: 0 -0.4rem 1.2rem rgba(17, 26, 51, 0.16); }
-.drawer.open { transform: translateY(0); }
-.tab { flex: none; height: var(--tab-h); width: 100%; display: flex; align-items: center; gap: 0.75rem; padding: 0 1.1rem; border: 0; background: var(--amber); color: var(--ink); text-align: left; cursor: pointer; touch-action: none; }
-.tab:hover { background: var(--amber-dark); }
-.tab .chev { flex: none; width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border: 2px solid var(--ink); border-radius: 2px; font-size: 0.75rem; line-height: 1; }
-.tab .tt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.tab strong { font-family: var(--display); font-weight: 700; font-size: 1.125rem; line-height: 1.2; }
-.tab .sub { font-family: var(--mono); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; }
-.drawer.open .tab .chev { transform: rotate(180deg); }
-.drawer-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .p-note { flex: none; padding: 0.7rem 1.1rem 0; font-size: 0.75rem; color: var(--muted); }
 .p-note.err { color: var(--err); }
 .p-note:empty { display: none; }
 
 .qlist { flex: 1; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 0.3rem 1.1rem 1rem; display: flex; flex-direction: column; gap: 0.85rem; }
-.drawer .qlist { padding-top: 0.8rem; }
 .qlist.now { --acc: var(--blue); --acc-soft: var(--tint); --acc-line: var(--blue-line); --glow: 35, 67, 221; }
 .qlist.end { --acc: var(--amber); --acc-soft: #FFFFFF; --acc-line: var(--amber-line); --glow: 240, 162, 2; }
 .q { display: flex; gap: 0.55rem; align-items: flex-start; }
@@ -224,10 +212,8 @@ button { font: inherit; color: inherit; }
   .live:not(.off) .dot { animation: blink 1.2s ease-in-out infinite; }
   .q.fresh { animation: pop-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.3) backwards; animation-delay: var(--d, 0ms); }
   .q.fresh .bubble { animation: fresh 2.4s ease-out backwards; animation-delay: var(--d, 0ms); }
-  .drawer { transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1); }
   .m-fill { transition: height 800ms cubic-bezier(0.2, 0.8, 0.2, 1), width 800ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 800ms ease; }
   .meter.pulse .m-track { animation: mpulse 900ms ease-out; }
-  .tab .chev { transition: transform 300ms ease; }
   .app.timeline .tl, .app.timeline .strip { animation: tl-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 }
 @keyframes tl-in { from { opacity: 0; transform: translateX(24px); } }
@@ -269,7 +255,7 @@ button { font: inherit; color: inherit; }
           <input id="localFile" type="file" accept="application/pdf,.pdf">
           <span>Use this if the folder list is empty or there is no internet.</span>
         </div>
-        <p class="keys">During the talk: <kbd>→</kbd> or the clicker for the next slide, <kbd>←</kbd> to go back, <kbd>F</kbd> full screen, <kbd>B</kbd> black screen, <kbd>Q</kbd> show or hide the questions, <kbd>E</kbd> open or close the end-of-talk questions, <kbd>A</kbd> show or hide the agreement meter, <kbd>T</kbd> agreement over the talk.</p>
+        <p class="keys">During the talk: <kbd>→</kbd> or the clicker for the next slide, <kbd>←</kbd> to go back, <kbd>F</kbd> full screen, <kbd>B</kbd> black screen, <kbd>Q</kbd> show or hide the questions, <kbd>A</kbd> show or hide the agreement meter, <kbd>T</kbd> agreement over the talk.</p>
       </div>
     </div>
 
@@ -306,21 +292,11 @@ button { font: inherit; color: inherit; }
 
     <div class="sheets">
       <section class="layer" id="nowLayer" aria-labelledby="nowTitle">
-        <div class="layer-head"><h2 id="nowTitle">During the talk</h2><span id="nNow" class="badge now">0</span></div>
+        <div class="layer-head"><h2 id="nowTitle">Live questions</h2><span id="nNow" class="badge now">0</span></div>
+        <p id="pNote" class="p-note"></p>
         <ol id="nowList" class="qlist now" aria-live="polite"></ol>
       </section>
 
-      <section class="drawer" id="drawer" aria-labelledby="endTitle">
-        <button id="tab" class="tab" type="button" aria-expanded="false" aria-controls="drawerBody">
-          <span class="chev" aria-hidden="true">▲</span>
-          <span class="tt"><strong id="endTitle">At the end of the talk</strong><span id="endSub" class="sub">Held · push to show</span></span>
-          <span id="nEnd" class="badge end">0</span>
-        </button>
-        <div class="drawer-body" id="drawerBody">
-          <p id="pNote" class="p-note"></p>
-          <ol id="endList" class="qlist end" aria-live="polite"></ol>
-        </div>
-      </section>
     </div>
   </aside>
 
@@ -571,7 +547,6 @@ button { font: inherit; color: inherit; }
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
     var k = ev.key;
     if (k === "q" || k === "Q") { togglePanel(); return; }
-    if (k === "e" || k === "E") { setDrawer(!Q.open); return; }
     if (k === "a" || k === "A") { toggleMeter(); return; }
     if (k === "t" || k === "T") { setTimeline(!inTimeline()); return; }
     if (inTimeline() && /^(ArrowRight|ArrowDown|PageDown|ArrowLeft|ArrowUp|PageUp| |Enter|Escape)$/.test(k)) { ev.preventDefault(); setTimeline(false); return; }
@@ -759,17 +734,12 @@ button { font: inherit; color: inherit; }
     if (Q.data && Q.data.feedback) { drawMeter(Q.data.feedback); drawTimeline(); }
     var d = Q.data || { questions: [], waiting: 0, released: false };
     var qs = d.questions || [];
-    var now = qs.filter(function (q) { return q.when !== "end"; }).sort(function (a, b) { return b.at - a.at; });   // newest first
-    var end = qs.filter(function (q) { return q.when === "end"; }).sort(function (a, b) { return a.at - b.at; });   // in the order asked
-    var endCount = d.released ? end.length : (d.waiting || 0);
+    var now = qs.slice().sort(function (a, b) { return b.at - a.at; });   // newest first
 
     var ok = Q.loaded && !Q.failed;
     $("live").className = "live" + (ok ? "" : " off");
     $("liveText").textContent = ok ? "live" : !Q.loaded ? (Q.failed ? "Offline" : "Connecting") : "Reconnecting";
     $("nNow").textContent = String(now.length);
-    $("nEnd").textContent = String(endCount);
-    $("endSub").textContent = Q.busy ? "Showing…" : Q.open ? (d.released ? "Shown to everyone · push to close" : "Push to close")
-                                                         : (d.released ? "Shown to everyone · push to open" : "Held · push to show");
 
     var first = !Q.hadData, burst = 0, nowMs = Date.now();
     function item(q) {
@@ -812,42 +782,8 @@ button { font: inherit; color: inherit; }
     }
     fill($("nowList"), now, waitText || "No questions yet. They appear here as the audience sends them.");
     if (newNow) scrollToNewest($("nowList"));
-    // The end-of-talk questions appear only once they are shown to everyone.
-    fill($("endList"), d.released ? end : [], waitText || (d.released ? "No questions were saved for the end." : "Showing the end-of-talk questions…"));
     if (Q.loaded) Q.hadData = true;
   }
-
-  // Push the amber tab: the drawer slides up over the list, and the end-of-talk
-  // questions are unhidden for everyone. Push again to slide it back down.
-  function setDrawer(open) {
-    Q.open = open;
-    $("drawer").classList.toggle("open", open);
-    $("tab").setAttribute("aria-expanded", open ? "true" : "false");
-    try { $("drawerBody").inert = !open; $("nowLayer").inert = open; } catch (e) {}
-    $("endList").scrollTop = 0;
-    drawQ();
-    if (!open || Q.busy || (Q.data && Q.data.released)) return;
-    Q.busy = true; drawQ();
-    sendQ({ action: "release", show: true }).then(function (d) {
-      if (d.ok) note("");
-      else if (d.error === "no_pin" || d.error === "wrong_pin" || d.error === "bad_request")
-        note("The questions sheet is running an older script. Redeploy it as a New version (Deploy > Manage deployments).", true);
-      else note("Couldn't show them. Close and push the tab again.", true);
-    }).catch(function () {
-      note("Couldn't reach the questions sheet. Close and push the tab again.", true);
-    }).then(function () { Q.busy = false; drawQ(); });
-  }
-  // A tap toggles; a swipe up opens and a swipe down closes.
-  var tabY = null;
-  $("tab").addEventListener("pointerdown", function (ev) { tabY = ev.clientY; });
-  $("tab").addEventListener("pointerup", function (ev) {
-    if (tabY === null) return;
-    var dy = ev.clientY - tabY; tabY = null;
-    setDrawer(dy < -30 ? true : dy > 30 ? false : !Q.open);
-  });
-  $("tab").addEventListener("keydown", function (ev) {
-    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); setDrawer(!Q.open); }
-  });
 
   function refreshQ() {
     if (!CONFIG.API_URL || Q.busy) return;
@@ -857,7 +793,6 @@ button { font: inherit; color: inherit; }
   /* =====================================================================
      START
      ===================================================================== */
-  setDrawer(false);
   refreshQ();
   setInterval(function () { if (document.visibilityState === "visible") refreshQ(); }, Math.max(3, CONFIG.REFRESH_SECONDS) * 1000);
   document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") refreshQ(); });
