@@ -237,7 +237,9 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
 .mod-tabs button { font: inherit; font-weight: 600; font-size: 0.9375rem; padding: 0.5rem 0.9rem; border: 0; background: none; color: var(--muted); cursor: pointer; border-bottom: 4px solid transparent; margin-bottom: -2px; }
 .mod-tabs button b { font-family: var(--mono); font-weight: 500; font-size: 0.8125rem; margin-left: 0.3rem; padding: 0 0.35rem; border-radius: 2px; background: var(--bg); color: var(--ink); }
 .mod-tabs button.on { color: var(--ink); border-bottom-color: var(--blue); }
-.mod-tabs button[data-tab="pending"].has b { background: var(--amber); }
+.mod-tabs button[data-tab="plain"].has b { background: var(--amber); }
+.mi-acts .push { border-color: var(--blue); background: var(--blue); color: #FFFFFF; }
+.mi-acts .push:hover { background: var(--navy); border-color: var(--navy); }
 .mod-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.7rem; }
 .mi { border: 1px solid var(--line); border-left: 6px solid var(--blue); padding: 0.75rem 0.9rem 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; background: var(--surface); transition: opacity 200ms; }
 .mi.end { border-left-color: var(--amber); }
@@ -257,10 +259,6 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
 .mod-empty { color: var(--muted); }
 .mod-reset { border-top: 1px solid var(--line); padding-top: 0.8rem; }
 .mod-reset .org-body { margin-top: 0.7rem; border: 0; padding: 0; }
-/* the audience's own questions while they wait for, or did not get, approval */
-.msg.pending .bubble { border-style: dashed; }
-.msg.rejected { opacity: 0.55; }
-.wait-note { font-size: 0.8125rem; color: var(--muted); margin-top: 0.35rem; }
 </style>
 </head>
 <body>
@@ -276,11 +274,11 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
       <span id="modState" class="label"></span>
       <button class="mod-ghost" id="modLock" type="button">Lock</button>
     </div>
-    <p class="mod-sub" id="modSub">Live (“Ask now”) questions wait here. Accepted ones go to the speaker's screen and to everyone's page; rejected ones stay hidden. End-of-talk questions don't need approval.</p>
+    <p class="mod-sub" id="modSub">Every question is in the live feed straight away. When the speaker hides the questions panel, only the “Ask now” questions you send to the speaker pop up on the slides. Hide removes a question for everyone.</p>
     <div class="mod-tabs" role="tablist">
-      <button type="button" role="tab" data-tab="pending" class="on">Waiting<b id="cPending">0</b></button>
-      <button type="button" role="tab" data-tab="accepted">Accepted<b id="cAccepted">0</b></button>
-      <button type="button" role="tab" data-tab="rejected">Rejected<b id="cRejected">0</b></button>
+      <button type="button" role="tab" data-tab="plain" class="on">New<b id="cPlain">0</b></button>
+      <button type="button" role="tab" data-tab="pushed">Sent to speaker<b id="cPushed">0</b></button>
+      <button type="button" role="tab" data-tab="hidden">Hidden<b id="cHidden">0</b></button>
     </div>
     <ol class="mod-list" id="modList"></ol>
     <p class="mod-empty" id="modEmpty"></p>
@@ -451,7 +449,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
           ? h("span", { class: "deleting-note", role: "status", text: "Deleting…" })
           : h("button", { class: "link" + (armed ? " danger" : ""), type: "button", text: armed ? "Confirm delete" : "Delete", onclick: function () { remove(q.id); } });
       }
-      return h("li", { class: "msg" + (q.mine ? " mine" : "") + (q.held ? " held" : "") + (q.answered ? " answered" : "") + (q.pending ? " pending" : "") + (q.rejected ? " rejected" : "") + (fresh ? " fresh" : "") + (S.deleting === q.id ? " deleting" : ""),
+      return h("li", { class: "msg" + (q.mine ? " mine" : "") + (q.held ? " held" : "") + (q.answered ? " answered" : "") + (fresh ? " fresh" : "") + (S.deleting === q.id ? " deleting" : ""),
                        style: fresh ? "--d:" + (-age) + "ms" : null },
         h("span", { class: "avatar", "aria-hidden": "true", text: q.emoji || "🙂" }),
         h("div", { class: "msg-main" },
@@ -460,13 +458,9 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
             h("span", { class: "time", text: q.time || "" }),
             q.mine ? h("span", { class: "chip", text: "You" }) : null,
             q.answered ? h("span", { class: "chip", text: "Answered" }) : null,
-            q.pending ? h("span", { class: "chip", text: "Waiting for approval" }) : null,
-            q.rejected ? h("span", { class: "chip", text: "Not accepted" }) : null,
             del),
           h("div", { class: "bubble", text: q.question }),
-          q.pending ? h("p", { class: "wait-note", text: "Only you can see it until the moderator accepts it." })
-            : q.rejected ? h("p", { class: "wait-note", text: "The moderator didn't put this one through. Only you can see it." })
-            : q.held ? h("p", { class: "held-note", text: "Held until the end of the talk. Only you can see it for now." }) : null));
+          q.held ? h("p", { class: "held-note", text: "Held until the end of the talk. Only you can see it for now." }) : null));
     }
 
     var nowList = $("nowList"), endList = $("endList");
@@ -477,8 +471,6 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     // During the talk: empty and error states.
     var nowEmpty = $("nowEmpty");
     nowEmpty.hidden = S.loaded && now.length > 0;
-    var optSub = document.querySelector("#optNow .sub");
-    if (optSub && d.moderated) optSub.textContent = "Goes up during the talk, once the moderator accepts it.";
     nowEmpty.textContent = !CONFIG.API_URL ? "Questions aren't connected yet. The organizer still needs to paste the Google Sheet link into this page."
       : !S.loaded ? (S.failed ? "Couldn't load the questions. Check your connection; the page keeps trying." : "Loading questions…")
       : "No questions yet. Ask the first one above.";
@@ -498,14 +490,13 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     tag.textContent = d.released ? "Released" : "Held until the end";
 
     // Live counts: questions during the talk, and for the end (held or shown).
-    var seen = function (q) { return !q.pending && !q.rejected; };
-    var endCount = d.released ? end.filter(seen).length : waiting, live = $("live"), ok = S.loaded && !S.failed;
+    var endCount = d.released ? end.length : waiting, live = $("live"), ok = S.loaded && !S.failed;
     live.className = "live" + (ok ? "" : " off");
     var state = h("span", { class: "stat" }, h("span", { class: "dot", "aria-hidden": "true" }),
       document.createTextNode(ok ? "live" : !S.loaded ? (S.failed ? "Offline" : "Connecting") : "Reconnecting"));
     if (!S.loaded) live.replaceChildren(state);
     else live.replaceChildren(
-      h("span", { class: "stat now" }, h("b", { text: String(now.filter(seen).length) }), document.createTextNode(" during the talk")),
+      h("span", { class: "stat now" }, h("b", { text: String(now.length) }), document.createTextNode(" during the talk")),
       h("span", { class: "stat end" }, h("b", { text: String(endCount) }), document.createTextNode(" for the end")),
       state);
 
@@ -557,8 +548,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
       if (d.ok) {
         $("question").value = ""; count();
         var as = d.shownAs ? " You appear as " + d.shownAs.emoji + " " + d.shownAs.alias + "." : "";
-        flash((timing === "end" ? "Saved for the end of the talk." : "Question sent.") + as
-          + (d.moderated && timing !== "end" ? " It appears for everyone once the moderator accepts it." : ""), "ok");
+        flash((timing === "end" ? "Saved for the end of the talk." : "Question sent.") + as, "ok");
       } else flash(ERRORS[d.error] || ("Couldn't send" + (d.detail ? " (" + d.detail + ")" : "") + ". Try again."), "err");
     }).catch(function () {
       flash("Couldn't reach the questions sheet. Check your connection and try again.", "err");
@@ -636,7 +626,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     load().catch(function () { S.failed = true; }).then(draw);
   }
   /* ---- organiser: PIN, moderator panel, reset ---- */
-  var M = { pin: "", data: null, tab: "pending", busy: {}, timer: 0, armed: false, armTimer: 0, resetting: false };
+  var M = { pin: "", data: null, tab: "plain", busy: {}, timer: 0, armed: false, armTimer: 0, resetting: false };
   var BASE_TITLE = document.title;
   var ORG_ERRORS = {
     no_pin_set: "No PIN is set. Type one in ORGANIZER_PIN at the top of the questions script, then redeploy it as a New version.",
@@ -684,7 +674,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
   function moderate(q, to) {
     if (M.busy[q.id]) return;
     var was = q.state;
-    M.busy[q.id] = true; q.state = to === "pending" ? "pending" : to; drawMod();   // move it at once; the sheet catches up
+    M.busy[q.id] = true; q.state = to; drawMod();   // move it at once; the sheet catches up
     modCall({ action: "moderate", id: q.id, to: to }).then(function (d) {
       if (d.admin) M.data = d.admin;
       if (d.questions) { S.data = d; S.loaded = true; draw(); }
@@ -694,24 +684,26 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
   }
   function drawMod() {
     if (!M.data) return;
-    var qs = M.data.questions || [], c = { pending: 0, accepted: 0, rejected: 0 };
-    qs.forEach(function (q) { c[q.state === "answered" ? "accepted" : q.state]++; });
-    $("cPending").textContent = c.pending; $("cAccepted").textContent = c.accepted; $("cRejected").textContent = c.rejected;
+    var tabOf = function (q) { return q.state === "answered" ? "plain" : q.state; };
+    var qs = M.data.questions || [], c = { plain: 0, pushed: 0, hidden: 0 }, fresh = 0;
+    qs.forEach(function (q) { c[tabOf(q)]++; if (q.state === "plain" && q.when !== "end") fresh++; });
+    $("cPlain").textContent = c.plain; $("cPushed").textContent = c.pushed; $("cHidden").textContent = c.hidden;
     [].forEach.call(document.querySelectorAll(".mod-tabs button"), function (b) {
       b.classList.toggle("on", b.getAttribute("data-tab") === M.tab);
       b.setAttribute("aria-selected", b.getAttribute("data-tab") === M.tab ? "true" : "false");
-      if (b.getAttribute("data-tab") === "pending") b.classList.toggle("has", c.pending > 0);
+      if (b.getAttribute("data-tab") === "plain") b.classList.toggle("has", fresh > 0);
     });
-    document.title = (c.pending ? "(" + c.pending + ") " : "") + BASE_TITLE;
-    $("modState").textContent = M.failed ? "Reconnecting…" : (M.data.approveFirst === false ? "Approval is off in the script" : "");
-    var rows = qs.filter(function (q) { return (q.state === "answered" ? "accepted" : q.state) === M.tab; });
-    rows.sort(M.tab === "pending" ? function (a, b) { return a.at - b.at; } : function (a, b) { return b.at - a.at; });   // queue: oldest first
+    document.title = (fresh ? "(" + fresh + ") " : "") + BASE_TITLE;
+    $("modState").textContent = M.failed ? "Reconnecting…" : "";
+    var rows = qs.filter(function (q) { return tabOf(q) === M.tab; });
+    rows.sort(function (a, b) { return b.at - a.at; });   // newest first
     var list = $("modList");
     list.replaceChildren.apply(list, rows.map(function (q) {
       var acts = [];
-      if (q.state !== "accepted" && q.state !== "answered") acts.push(h("button", { class: "ok", type: "button", text: "Accept", onclick: function () { moderate(q, "accepted"); } }));
-      if (q.state !== "rejected") acts.push(h("button", { class: "no", type: "button", text: "Reject", onclick: function () { moderate(q, "rejected"); } }));
-      if (q.state !== "pending") acts.push(h("button", { class: "back", type: "button", text: "Back to waiting", onclick: function () { moderate(q, "pending"); } }));
+      if (q.state === "plain" && q.when !== "end") acts.push(h("button", { class: "push", type: "button", text: "Send to speaker", onclick: function () { moderate(q, "pushed"); } }));
+      if (q.state === "pushed") acts.push(h("button", { class: "back", type: "button", text: "Take back", onclick: function () { moderate(q, "plain"); } }));
+      if (q.state === "hidden") acts.push(h("button", { class: "ok", type: "button", text: "Unhide", onclick: function () { moderate(q, "plain"); } }));
+      else acts.push(h("button", { class: "no", type: "button", text: "Hide", onclick: function () { moderate(q, "hidden"); } }));
       return h("li", { class: "mi " + (q.when === "end" ? "end" : "now") + (M.busy[q.id] ? " busy" : "") },
         h("div", { class: "mi-top" },
           h("span", { class: "em", "aria-hidden": "true", text: q.emoji || "🙂" }),
@@ -723,8 +715,8 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
         h.apply(null, ["div", { class: "mi-acts" }].concat(acts)));
     }));
     $("modEmpty").hidden = rows.length > 0;
-    $("modEmpty").textContent = M.tab === "pending" ? "No live questions waiting. New ones appear here as people send them."
-      : M.tab === "accepted" ? "Nothing accepted yet." : "Nothing rejected.";
+    $("modEmpty").textContent = M.tab === "plain" ? "No questions yet. They appear here as people send them."
+      : M.tab === "pushed" ? "Nothing sent to the speaker yet." : "Nothing hidden.";
   }
   [].forEach.call(document.querySelectorAll(".mod-tabs button"), function (b) {
     b.addEventListener("click", function () { M.tab = b.getAttribute("data-tab"); drawMod(); });

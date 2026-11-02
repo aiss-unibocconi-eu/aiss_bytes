@@ -236,8 +236,8 @@ button { font: inherit; color: inherit; }
 @keyframes pop-in { from { transform: translateY(8px) scale(0.97); opacity: 0; } }
 @keyframes fresh { 0%, 30% { box-shadow: 0 0 0 3px rgba(var(--glow), 0.6); } 100% { box-shadow: 0 0 0 3px rgba(var(--glow), 0); } }
 
-/* ---- pop-ups: with the questions hidden, each new "Ask now" question appears over
-   the slides for a few seconds, bottom right, then fades. Click one to dismiss it. ---- */
+/* ---- pop-ups: with the questions hidden, each "Ask now" question the moderator sends to
+   the speaker appears over the slides for a minute, bottom right, then fades. Click to dismiss. ---- */
 .pops { position: fixed; right: calc(var(--pop-right, 0px) + 18px); bottom: 62px; z-index: 40; width: min(30rem, calc(100vw - 36px)); display: flex; flex-direction: column-reverse; gap: 10px; pointer-events: none; }
 .app.timeline ~ .pops { bottom: 18px; }
 .pop { pointer-events: auto; cursor: pointer; display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.85rem 1rem 0.95rem; background: var(--surface); color: var(--ink); border: 2px solid var(--ink); border-left: 8px solid var(--blue); box-shadow: 8px 8px 0 rgba(17, 26, 51, 0.28); border-radius: 2px; transition: opacity 500ms ease, transform 500ms ease; }
@@ -523,7 +523,7 @@ button { font: inherit; color: inherit; }
     } catch (e) {}
   }
 
-  /* ---- pop-ups for new "Ask now" questions while the questions are hidden ---- */
+  /* ---- pop-ups for questions the moderator sends, while the questions are hidden ---- */
   var POP_SECONDS = 60, POP_MAX = 3, unseen = 0;
   var pops = document.createElement("div");
   pops.className = "pops"; pops.setAttribute("aria-live", "polite");
@@ -538,7 +538,7 @@ button { font: inherit; color: inherit; }
     var el = h("div", { class: "pop in", title: "Click to dismiss" },
       h("span", { class: "av", "aria-hidden": "true", text: q.emoji || "🙂" }),
       h("div", { class: "pm" },
-        h("p", { class: "pk", text: "New question" + (q.time ? " · " + q.time : "") }),
+        h("p", { class: "pk", text: "Question for you" + (q.time ? " · asked " + q.time : "") }),
         h("p", { class: "pw", text: q.alias || "A guest" }),
         h("p", { class: "pq", text: q.question })));
     el.addEventListener("click", function () { dropPop(el); });
@@ -613,7 +613,7 @@ button { font: inherit; color: inherit; }
   /* =====================================================================
      QUESTIONS (the same Google Sheet as questions.html)
      ===================================================================== */
-  var Q = { data: null, loaded: false, failed: false, busy: false, open: false, hadData: false, firstSeen: {} };
+  var Q = { data: null, loaded: false, failed: false, busy: false, open: false, hadData: false, firstSeen: {}, pushSeen: {} };
   function newKey() {
     var a = new Uint8Array(16), s = "", i;
     (window.crypto || window.msCrypto).getRandomValues(a);
@@ -795,10 +795,16 @@ button { font: inherit; color: inherit; }
     // A new during-the-talk question scrolls the list back to the top, where the newest sits.
     var fresh = Q.loaded && !first ? now.filter(function (q) { return Q.firstSeen[q.id] === undefined; }) : [];
     var newNow = fresh.length > 0;
-    // With the questions hidden, each new one pops up over the slides, oldest first.
-    if (newNow && panelHidden()) {
-      fresh.slice().reverse().forEach(function (q) { if (!q.mine) popQuestion(q); });
-      unseen += fresh.length; markUnseen();
+    if (newNow && panelHidden()) { unseen += fresh.length; markUnseen(); }
+    // With the questions hidden, the questions the moderator sends to the speaker pop up
+    // over the slides, at the moment they are sent, oldest first.
+    if (Q.loaded) {
+      now.slice().reverse().forEach(function (q) {
+        if (!q.pushed) { delete Q.pushSeen[q.id]; return; }
+        if (Q.pushSeen[q.id]) return;
+        Q.pushSeen[q.id] = true;
+        if (!first && panelHidden()) popQuestion(q);
+      });
     }
     fill($("nowList"), now, waitText || "No questions yet. They appear here as the audience sends them.");
     if (newNow) scrollToNewest($("nowList"));
