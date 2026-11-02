@@ -535,7 +535,7 @@ button { font: inherit; color: inherit; }
     setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 520);
   }
   function popQuestion(q) {
-    var el = h("div", { class: "pop in", title: "Click to dismiss" },
+    var el = h("div", { class: "pop in", title: "Click to dismiss", "data-id": q.id },
       h("span", { class: "av", "aria-hidden": "true", text: q.emoji || "🙂" }),
       h("div", { class: "pm" },
         h("p", { class: "pk", text: "Question for you" + (q.time ? " · asked " + q.time : "") }),
@@ -805,6 +805,10 @@ button { font: inherit; color: inherit; }
         Q.pushSeen[q.id] = true;
         if (!first && panelHidden()) popQuestion(q);
       });
+      // The moderator took a question back or hid it: its pop-up closes at once.
+      var sent = {};
+      now.forEach(function (q) { if (q.pushed) sent[q.id] = true; });
+      [].forEach.call(pops.querySelectorAll(".pop"), function (el) { if (!sent[el.getAttribute("data-id")]) dropPop(el); });
     }
     fill($("nowList"), now, waitText || "No questions yet. They appear here as the audience sends them.");
     if (newNow) scrollToNewest($("nowList"));

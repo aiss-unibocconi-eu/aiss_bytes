@@ -274,7 +274,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
       <span id="modState" class="label"></span>
       <button class="mod-ghost" id="modLock" type="button">Lock</button>
     </div>
-    <p class="mod-sub" id="modSub">Every question is in the live feed straight away. When the speaker hides the questions panel, only the “Ask now” questions you send to the speaker pop up on the slides. Hide removes a question for everyone.</p>
+    <p class="mod-sub" id="modSub">Every question is in the live feed straight away. When the speaker hides the questions panel, only the “Ask now” questions you send to the speaker pop up on the slides, for up to a minute. “Remove from speaker's screen” closes a pop-up early. Hide removes a question for everyone.</p>
     <div class="mod-tabs" role="tablist">
       <button type="button" role="tab" data-tab="plain" class="on">New<b id="cPlain">0</b></button>
       <button type="button" role="tab" data-tab="pushed">Sent to speaker<b id="cPushed">0</b></button>
@@ -701,7 +701,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     list.replaceChildren.apply(list, rows.map(function (q) {
       var acts = [];
       if (q.state === "plain" && q.when !== "end") acts.push(h("button", { class: "push", type: "button", text: "Send to speaker", onclick: function () { moderate(q, "pushed"); } }));
-      if (q.state === "pushed") acts.push(h("button", { class: "back", type: "button", text: "Take back", onclick: function () { moderate(q, "plain"); } }));
+      if (q.state === "pushed") acts.push(h("button", { class: "back", type: "button", text: "Remove from speaker's screen", onclick: function () { moderate(q, "plain"); } }));
       if (q.state === "hidden") acts.push(h("button", { class: "ok", type: "button", text: "Unhide", onclick: function () { moderate(q, "plain"); } }));
       else acts.push(h("button", { class: "no", type: "button", text: "Hide", onclick: function () { moderate(q, "hidden"); } }));
       return h("li", { class: "mi " + (q.when === "end" ? "end" : "now") + (M.busy[q.id] ? " busy" : "") },
