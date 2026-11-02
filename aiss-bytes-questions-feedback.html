@@ -225,6 +225,42 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
 .org-btn:disabled { opacity: 0.6; cursor: default; }
 .org-note { font-size: 0.875rem; min-height: 1.3em; }
 .org-note.err { color: var(--err); font-weight: 500; }
+
+/* ---- moderator panel (after the PIN): accept or reject questions before anyone sees them ---- */
+.mod { background: var(--surface); border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--navy); padding: 1.1rem 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 0.9rem; }
+.mod-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1rem; }
+.mod-head h2 { font-family: var(--display); font-weight: 700; font-size: 1.5rem; line-height: 1.15; flex: 1; }
+.mod-sub { font-size: 0.9375rem; color: var(--muted); }
+.mod-ghost { font: inherit; font-family: var(--mono); font-size: 0.75rem; padding: 0.3rem 0.7rem; border: 1px solid var(--line); border-radius: 2px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.mod-ghost:hover { border-color: var(--ink); }
+.mod-tabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 2px solid var(--ink); }
+.mod-tabs button { font: inherit; font-weight: 600; font-size: 0.9375rem; padding: 0.5rem 0.9rem; border: 0; background: none; color: var(--muted); cursor: pointer; border-bottom: 4px solid transparent; margin-bottom: -2px; }
+.mod-tabs button b { font-family: var(--mono); font-weight: 500; font-size: 0.8125rem; margin-left: 0.3rem; padding: 0 0.35rem; border-radius: 2px; background: var(--bg); color: var(--ink); }
+.mod-tabs button.on { color: var(--ink); border-bottom-color: var(--blue); }
+.mod-tabs button[data-tab="pending"].has b { background: var(--amber); }
+.mod-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+.mi { border: 1px solid var(--line); border-left: 6px solid var(--blue); padding: 0.75rem 0.9rem 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; background: var(--surface); transition: opacity 200ms; }
+.mi.end { border-left-color: var(--amber); }
+.mi.busy { opacity: 0.5; pointer-events: none; }
+.mi-top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; font-size: 0.875rem; }
+.mi-top .em { font-family: var(--emoji); font-size: 1.1rem; }
+.mi-top .who { font-weight: 600; }
+.mi-top .when { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.mi-q { font-size: 1.0625rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mi-acts { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.mi-acts button { font: inherit; font-weight: 600; font-size: 0.9375rem; padding: 0.45rem 1rem; border-radius: 2px; cursor: pointer; border: 2px solid; }
+.mi-acts .ok { border-color: var(--agree, #148A6A); background: var(--agree, #148A6A); color: #FFFFFF; }
+.mi-acts .ok:hover { background: var(--agree-dark, #0F6E55); border-color: var(--agree-dark, #0F6E55); }
+.mi-acts .no { border-color: var(--disagree, #D2493B); background: var(--surface); color: var(--disagree-dark, #A93427); }
+.mi-acts .no:hover { background: var(--disagree-soft, #FBE8E4); }
+.mi-acts .back { border-color: var(--line); background: var(--surface); color: var(--muted); border-width: 1px; font-weight: 500; }
+.mod-empty { color: var(--muted); }
+.mod-reset { border-top: 1px solid var(--line); padding-top: 0.8rem; }
+.mod-reset .org-body { margin-top: 0.7rem; border: 0; padding: 0; }
+/* the audience's own questions while they wait for, or did not get, approval */
+.msg.pending .bubble { border-style: dashed; }
+.msg.rejected { opacity: 0.55; }
+.wait-note { font-size: 0.8125rem; color: var(--muted); margin-top: 0.35rem; }
 </style>
 </head>
 <body>
@@ -233,6 +269,34 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     <span>AI in Social Sciences Lab · Bocconi University</span>
     <span>Live questions</span>
   </div>
+
+  <section class="mod" id="mod" hidden aria-labelledby="modTitle">
+    <div class="mod-head">
+      <h2 id="modTitle">Moderator</h2>
+      <span id="modState" class="label"></span>
+      <button class="mod-ghost" id="modLock" type="button">Lock</button>
+    </div>
+    <p class="mod-sub" id="modSub">Live (“Ask now”) questions wait here. Accepted ones go to the speaker's screen and to everyone's page; rejected ones stay hidden. End-of-talk questions don't need approval.</p>
+    <div class="mod-tabs" role="tablist">
+      <button type="button" role="tab" data-tab="pending" class="on">Waiting<b id="cPending">0</b></button>
+      <button type="button" role="tab" data-tab="accepted">Accepted<b id="cAccepted">0</b></button>
+      <button type="button" role="tab" data-tab="rejected">Rejected<b id="cRejected">0</b></button>
+    </div>
+    <ol class="mod-list" id="modList"></ol>
+    <p class="mod-empty" id="modEmpty"></p>
+    <details class="mod-reset">
+      <summary class="label">Restart for a new session</summary>
+      <div class="org-body">
+        <p class="org-sub">Clears today's questions and/or reactions for everyone. Nothing is lost: the rows move to archive tabs in the Google Sheet.</p>
+        <div class="org-row">
+          <label class="org-check"><input type="checkbox" id="orgQ" checked> Questions</label>
+          <label class="org-check"><input type="checkbox" id="orgR" checked> Reactions</label>
+          <button class="org-btn" id="orgGo" type="button">Clear and restart</button>
+        </div>
+        <p class="org-note" id="resetNote" role="status"></p>
+      </div>
+    </details>
+  </section>
 
   <header class="hero">
     <h1 class="mark"><span class="w b">AISS</span> <span class="w">Bytes</span></h1>
@@ -299,15 +363,11 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     <details class="org" id="org">
       <summary class="label">Organiser</summary>
       <div class="org-body">
-        <p class="org-title">Restart for a new session</p>
-        <p class="org-sub">Clears today's questions and/or reactions for everyone. Nothing is lost: the rows move to archive tabs in the Google Sheet.</p>
-        <div class="org-row">
-          <label class="org-check"><input type="checkbox" id="orgQ" checked> Questions</label>
-          <label class="org-check"><input type="checkbox" id="orgR" checked> Reactions</label>
-        </div>
+        <p class="org-title">Moderator panel</p>
+        <p class="org-sub">Read new questions and choose which ones go to the speaker.</p>
         <div class="org-row">
           <input class="org-pin" id="orgPin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="Organiser PIN">
-          <button class="org-btn" id="orgGo" type="button">Clear and restart</button>
+          <button class="btn" id="orgOpen" type="button">Open</button>
         </div>
         <p class="org-note" id="orgNote" role="status"></p>
       </div>
@@ -391,7 +451,7 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
           ? h("span", { class: "deleting-note", role: "status", text: "Deleting…" })
           : h("button", { class: "link" + (armed ? " danger" : ""), type: "button", text: armed ? "Confirm delete" : "Delete", onclick: function () { remove(q.id); } });
       }
-      return h("li", { class: "msg" + (q.mine ? " mine" : "") + (q.held ? " held" : "") + (q.answered ? " answered" : "") + (fresh ? " fresh" : "") + (S.deleting === q.id ? " deleting" : ""),
+      return h("li", { class: "msg" + (q.mine ? " mine" : "") + (q.held ? " held" : "") + (q.answered ? " answered" : "") + (q.pending ? " pending" : "") + (q.rejected ? " rejected" : "") + (fresh ? " fresh" : "") + (S.deleting === q.id ? " deleting" : ""),
                        style: fresh ? "--d:" + (-age) + "ms" : null },
         h("span", { class: "avatar", "aria-hidden": "true", text: q.emoji || "🙂" }),
         h("div", { class: "msg-main" },
@@ -400,9 +460,13 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
             h("span", { class: "time", text: q.time || "" }),
             q.mine ? h("span", { class: "chip", text: "You" }) : null,
             q.answered ? h("span", { class: "chip", text: "Answered" }) : null,
+            q.pending ? h("span", { class: "chip", text: "Waiting for approval" }) : null,
+            q.rejected ? h("span", { class: "chip", text: "Not accepted" }) : null,
             del),
           h("div", { class: "bubble", text: q.question }),
-          q.held ? h("p", { class: "held-note", text: "Held until the end of the talk. Only you can see it for now." }) : null));
+          q.pending ? h("p", { class: "wait-note", text: "Only you can see it until the moderator accepts it." })
+            : q.rejected ? h("p", { class: "wait-note", text: "The moderator didn't put this one through. Only you can see it." })
+            : q.held ? h("p", { class: "held-note", text: "Held until the end of the talk. Only you can see it for now." }) : null));
     }
 
     var nowList = $("nowList"), endList = $("endList");
@@ -413,6 +477,8 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     // During the talk: empty and error states.
     var nowEmpty = $("nowEmpty");
     nowEmpty.hidden = S.loaded && now.length > 0;
+    var optSub = document.querySelector("#optNow .sub");
+    if (optSub && d.moderated) optSub.textContent = "Goes up during the talk, once the moderator accepts it.";
     nowEmpty.textContent = !CONFIG.API_URL ? "Questions aren't connected yet. The organizer still needs to paste the Google Sheet link into this page."
       : !S.loaded ? (S.failed ? "Couldn't load the questions. Check your connection; the page keeps trying." : "Loading questions…")
       : "No questions yet. Ask the first one above.";
@@ -432,13 +498,14 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     tag.textContent = d.released ? "Released" : "Held until the end";
 
     // Live counts: questions during the talk, and for the end (held or shown).
-    var endCount = d.released ? end.length : waiting, live = $("live"), ok = S.loaded && !S.failed;
+    var seen = function (q) { return !q.pending && !q.rejected; };
+    var endCount = d.released ? end.filter(seen).length : waiting, live = $("live"), ok = S.loaded && !S.failed;
     live.className = "live" + (ok ? "" : " off");
     var state = h("span", { class: "stat" }, h("span", { class: "dot", "aria-hidden": "true" }),
       document.createTextNode(ok ? "live" : !S.loaded ? (S.failed ? "Offline" : "Connecting") : "Reconnecting"));
     if (!S.loaded) live.replaceChildren(state);
     else live.replaceChildren(
-      h("span", { class: "stat now" }, h("b", { text: String(now.length) }), document.createTextNode(" during the talk")),
+      h("span", { class: "stat now" }, h("b", { text: String(now.filter(seen).length) }), document.createTextNode(" during the talk")),
       h("span", { class: "stat end" }, h("b", { text: String(endCount) }), document.createTextNode(" for the end")),
       state);
 
@@ -490,7 +557,8 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
       if (d.ok) {
         $("question").value = ""; count();
         var as = d.shownAs ? " You appear as " + d.shownAs.emoji + " " + d.shownAs.alias + "." : "";
-        flash((timing === "end" ? "Saved for the end of the talk." : "Question sent.") + as, "ok");
+        flash((timing === "end" ? "Saved for the end of the talk." : "Question sent.") + as
+          + (d.moderated && timing !== "end" ? " It appears for everyone once the moderator accepts it." : ""), "ok");
       } else flash(ERRORS[d.error] || ("Couldn't send" + (d.detail ? " (" + d.detail + ")" : "") + ". Try again."), "err");
     }).catch(function () {
       flash("Couldn't reach the questions sheet. Check your connection and try again.", "err");
@@ -567,43 +635,129 @@ h2.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.75r
     if (!CONFIG.API_URL || S.busy) return;
     load().catch(function () { S.failed = true; }).then(draw);
   }
-  /* ---- organiser reset ---- */
-  var ORG = { armed: false, timer: 0, busy: false };
+  /* ---- organiser: PIN, moderator panel, reset ---- */
+  var M = { pin: "", data: null, tab: "pending", busy: {}, timer: 0, armed: false, armTimer: 0, resetting: false };
+  var BASE_TITLE = document.title;
   var ORG_ERRORS = {
-    no_pin_set: "No PIN is set yet. Type one in ORGANIZER_PIN at the top of the questions script, then redeploy it as a New version.",
+    no_pin_set: "No PIN is set. Type one in ORGANIZER_PIN at the top of the questions script, then redeploy it as a New version.",
     wrong_pin: "Wrong PIN.",
     pin_locked: "Too many wrong PINs. Try again in 10 minutes.",
     nothing_chosen: "Tick questions, reactions, or both.",
     busy: "The sheet is busy. Try again in a few seconds.",
+    not_found: "That question is no longer in the sheet.",
     bad_request: "The questions sheet needs its latest script: paste it and redeploy as a New version."
   };
-  function orgNote(text, err) { $("orgNote").textContent = text; $("orgNote").className = "org-note" + (err ? " err" : ""); }
-  function orgDisarm() { ORG.armed = false; clearTimeout(ORG.timer); $("orgGo").classList.remove("arm"); $("orgGo").textContent = "Clear and restart"; }
+  function orgNote(id, text, err) { $(id).textContent = text; $(id).className = "org-note" + (err ? " err" : ""); }
+  function modCall(body) {
+    body.key = KEY; body.pin = M.pin;
+    return fetch(CONFIG.API_URL, { method: "POST", redirect: "follow", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body) }).then(readJson);
+  }
+  function savePin(p) { try { if (p) sessionStorage.setItem("aiss-qa-pin", p); else sessionStorage.removeItem("aiss-qa-pin"); } catch (e) {} }
+
+  function modOpen(pin, quiet) {
+    if (!CONFIG.API_URL) { orgNote("orgNote", "The page isn't connected to a sheet yet.", true); return; }
+    M.pin = pin; $("orgOpen").disabled = true; if (!quiet) orgNote("orgNote", "Checking…");
+    modCall({ action: "admin" }).then(function (d) {
+      if (!d.ok || !d.admin) { M.pin = ""; savePin(""); if (!quiet) orgNote("orgNote", ORG_ERRORS[d.error] || ("Couldn't open: " + (d.detail || d.error || "unknown problem") + "."), true); return; }
+      savePin(pin); M.data = d.admin; $("orgPin").value = ""; orgNote("orgNote", "");
+      $("org").open = false; $("org").hidden = true; $("mod").hidden = false;
+      drawMod();
+      if (!quiet) $("mod").scrollIntoView({ behavior: "smooth", block: "start" });
+      clearInterval(M.timer);
+      M.timer = setInterval(function () { if (document.visibilityState === "visible") modRefresh(); }, 4000);
+    }).catch(function () { M.pin = ""; if (!quiet) orgNote("orgNote", "Couldn't reach the questions sheet. Try again.", true); })
+      .then(function () { $("orgOpen").disabled = false; });
+  }
+  function modLock() {
+    clearInterval(M.timer); M.pin = ""; M.data = null; savePin("");
+    $("mod").hidden = true; $("org").hidden = false; document.title = BASE_TITLE;
+  }
+  function modRefresh() {
+    if (!M.pin) return;
+    modCall({ action: "admin" }).then(function (d) {
+      if (d.ok && d.admin) { M.data = d.admin; M.failed = false; }
+      else if (d.error === "wrong_pin" || d.error === "no_pin_set") { modLock(); orgNote("orgNote", "The PIN changed. Type the new one.", true); return; }
+      else M.failed = true;
+      drawMod();
+    }).catch(function () { M.failed = true; drawMod(); });
+  }
+  function moderate(q, to) {
+    if (M.busy[q.id]) return;
+    var was = q.state;
+    M.busy[q.id] = true; q.state = to === "pending" ? "pending" : to; drawMod();   // move it at once; the sheet catches up
+    modCall({ action: "moderate", id: q.id, to: to }).then(function (d) {
+      if (d.admin) M.data = d.admin;
+      if (d.questions) { S.data = d; S.loaded = true; draw(); }
+      if (!d.ok) { q.state = was; orgNote("resetNote", ""); $("modState").textContent = ORG_ERRORS[d.error] || ("Couldn't save: " + (d.detail || d.error)); }
+    }).catch(function () { q.state = was; $("modState").textContent = "Couldn't reach the sheet. Try again."; })
+      .then(function () { delete M.busy[q.id]; drawMod(); });
+  }
+  function drawMod() {
+    if (!M.data) return;
+    var qs = M.data.questions || [], c = { pending: 0, accepted: 0, rejected: 0 };
+    qs.forEach(function (q) { c[q.state === "answered" ? "accepted" : q.state]++; });
+    $("cPending").textContent = c.pending; $("cAccepted").textContent = c.accepted; $("cRejected").textContent = c.rejected;
+    [].forEach.call(document.querySelectorAll(".mod-tabs button"), function (b) {
+      b.classList.toggle("on", b.getAttribute("data-tab") === M.tab);
+      b.setAttribute("aria-selected", b.getAttribute("data-tab") === M.tab ? "true" : "false");
+      if (b.getAttribute("data-tab") === "pending") b.classList.toggle("has", c.pending > 0);
+    });
+    document.title = (c.pending ? "(" + c.pending + ") " : "") + BASE_TITLE;
+    $("modState").textContent = M.failed ? "Reconnecting…" : (M.data.approveFirst === false ? "Approval is off in the script" : "");
+    var rows = qs.filter(function (q) { return (q.state === "answered" ? "accepted" : q.state) === M.tab; });
+    rows.sort(M.tab === "pending" ? function (a, b) { return a.at - b.at; } : function (a, b) { return b.at - a.at; });   // queue: oldest first
+    var list = $("modList");
+    list.replaceChildren.apply(list, rows.map(function (q) {
+      var acts = [];
+      if (q.state !== "accepted" && q.state !== "answered") acts.push(h("button", { class: "ok", type: "button", text: "Accept", onclick: function () { moderate(q, "accepted"); } }));
+      if (q.state !== "rejected") acts.push(h("button", { class: "no", type: "button", text: "Reject", onclick: function () { moderate(q, "rejected"); } }));
+      if (q.state !== "pending") acts.push(h("button", { class: "back", type: "button", text: "Back to waiting", onclick: function () { moderate(q, "pending"); } }));
+      return h("li", { class: "mi " + (q.when === "end" ? "end" : "now") + (M.busy[q.id] ? " busy" : "") },
+        h("div", { class: "mi-top" },
+          h("span", { class: "em", "aria-hidden": "true", text: q.emoji || "🙂" }),
+          h("span", { class: "who", text: q.alias || "A guest" }),
+          h("span", { class: "when", text: q.time || "" }),
+          h("span", { class: "tag " + (q.when === "end" ? "end" : "now"), text: q.when === "end" ? "At the end" : "Ask now" }),
+          q.state === "answered" ? h("span", { class: "tag", text: "Answered" }) : null),
+        h("p", { class: "mi-q", text: q.question }),
+        h.apply(null, ["div", { class: "mi-acts" }].concat(acts)));
+    }));
+    $("modEmpty").hidden = rows.length > 0;
+    $("modEmpty").textContent = M.tab === "pending" ? "No live questions waiting. New ones appear here as people send them."
+      : M.tab === "accepted" ? "Nothing accepted yet." : "Nothing rejected.";
+  }
+  [].forEach.call(document.querySelectorAll(".mod-tabs button"), function (b) {
+    b.addEventListener("click", function () { M.tab = b.getAttribute("data-tab"); drawMod(); });
+  });
+  $("orgOpen").addEventListener("click", function () {
+    var pin = $("orgPin").value.trim();
+    if (!pin) { orgNote("orgNote", "Type the PIN first.", true); $("orgPin").focus(); return; }
+    modOpen(pin);
+  });
+  $("orgPin").addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); $("orgOpen").click(); } });
+  $("modLock").addEventListener("click", modLock);
+  try { var keptPin = sessionStorage.getItem("aiss-qa-pin"); if (keptPin) modOpen(keptPin, true); } catch (e) {}
+
+  // Reset: first tap arms the button; the second, within 5 seconds, clears for everyone.
+  function resetDisarm() { M.armed = false; clearTimeout(M.armTimer); $("orgGo").classList.remove("arm"); $("orgGo").textContent = "Clear and restart"; }
   $("orgGo").addEventListener("click", function () {
-    if (ORG.busy) return;
-    var q = $("orgQ").checked, r = $("orgR").checked, pin = $("orgPin").value.trim();
-    if (!q && !r) { orgNote(ORG_ERRORS.nothing_chosen, true); return; }
-    if (!pin) { orgNote("Type the PIN first.", true); $("orgPin").focus(); return; }
-    if (!CONFIG.API_URL) { orgNote("The page isn't connected to a sheet yet.", true); return; }
-    // First tap arms the button; the second, within 5 seconds, clears for everyone.
-    if (!ORG.armed) {
-      ORG.armed = true; $("orgGo").classList.add("arm");
-      $("orgGo").textContent = "Tap again to clear for everyone";
-      ORG.timer = setTimeout(orgDisarm, 5000); orgNote(""); return;
+    if (M.resetting || !M.pin) return;
+    var q = $("orgQ").checked, r = $("orgR").checked;
+    if (!q && !r) { orgNote("resetNote", ORG_ERRORS.nothing_chosen, true); return; }
+    if (!M.armed) {
+      M.armed = true; $("orgGo").classList.add("arm"); $("orgGo").textContent = "Tap again to clear for everyone";
+      M.armTimer = setTimeout(resetDisarm, 5000); orgNote("resetNote", ""); return;
     }
-    orgDisarm();
-    ORG.busy = true; $("orgGo").disabled = true; $("orgGo").textContent = "Clearing…"; orgNote("");
-    fetch(CONFIG.API_URL, { method: "POST", redirect: "follow", headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "reset", key: KEY, pin: pin, questions: q, reactions: r }) })
-      .then(readJson).then(function (d) {
-        if (d.ok) {
-          var what = q && r ? "Questions and reactions" : q ? "Questions" : "Reactions";
-          orgNote(what + " cleared. Everyone starts fresh."); $("orgPin").value = "";
-          if (d.questions) { S.data = d; S.loaded = true; }
-          draw();
-        } else orgNote(ORG_ERRORS[d.error] || ("Couldn't clear: " + (d.detail || d.error || "unknown problem") + "."), true);
-      }).catch(function () { orgNote("Couldn't reach the questions sheet. Try again.", true); })
-      .then(function () { ORG.busy = false; $("orgGo").disabled = false; $("orgGo").textContent = "Clear and restart"; });
+    resetDisarm();
+    M.resetting = true; $("orgGo").disabled = true; $("orgGo").textContent = "Clearing…";
+    modCall({ action: "reset", questions: q, reactions: r }).then(function (d) {
+      if (d.ok) {
+        orgNote("resetNote", (q && r ? "Questions and reactions" : q ? "Questions" : "Reactions") + " cleared. Everyone starts fresh.");
+        if (d.questions) { S.data = d; S.loaded = true; draw(); }
+        modRefresh();
+      } else orgNote("resetNote", ORG_ERRORS[d.error] || ("Couldn't clear: " + (d.detail || d.error || "unknown problem") + "."), true);
+    }).catch(function () { orgNote("resetNote", "Couldn't reach the questions sheet. Try again.", true); })
+      .then(function () { M.resetting = false; $("orgGo").disabled = false; $("orgGo").textContent = "Clear and restart"; });
   });
 
   refresh();

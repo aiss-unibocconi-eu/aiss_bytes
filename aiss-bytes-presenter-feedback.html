@@ -66,6 +66,7 @@ button { font: inherit; color: inherit; }
 
 .app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) var(--panel-w) var(--meter-w); }
 .app.no-panel { grid-template-columns: minmax(0, 1fr) 0 var(--meter-w); }
+.app:not(.no-meter) ~ .pops { --pop-right: var(--meter-w); }
 .app.no-meter { grid-template-columns: minmax(0, 1fr) var(--panel-w) 0; }
 .app.no-panel.no-meter { grid-template-columns: minmax(0, 1fr) 0 0; }
 .app.no-panel .panel, .app.no-meter .meter { display: none; }
@@ -234,6 +235,23 @@ button { font: inherit; color: inherit; }
 @keyframes blink { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(224, 48, 43, 0.5); } 50% { opacity: 0.25; box-shadow: 0 0 0 0.3rem rgba(224, 48, 43, 0); } }
 @keyframes pop-in { from { transform: translateY(8px) scale(0.97); opacity: 0; } }
 @keyframes fresh { 0%, 30% { box-shadow: 0 0 0 3px rgba(var(--glow), 0.6); } 100% { box-shadow: 0 0 0 3px rgba(var(--glow), 0); } }
+
+/* ---- pop-ups: with the questions hidden, each new "Ask now" question appears over
+   the slides for a few seconds, bottom right, then fades. Click one to dismiss it. ---- */
+.pops { position: fixed; right: calc(var(--pop-right, 0px) + 18px); bottom: 62px; z-index: 40; width: min(30rem, calc(100vw - 36px)); display: flex; flex-direction: column-reverse; gap: 10px; pointer-events: none; }
+.app.timeline ~ .pops { bottom: 18px; }
+.pop { pointer-events: auto; cursor: pointer; display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.85rem 1rem 0.95rem; background: var(--surface); color: var(--ink); border: 2px solid var(--ink); border-left: 8px solid var(--blue); box-shadow: 8px 8px 0 rgba(17, 26, 51, 0.28); border-radius: 2px; transition: opacity 500ms ease, transform 500ms ease; }
+.pop.out { opacity: 0; transform: translateY(10px); }
+.pop .av { flex: none; width: 2.4rem; height: 2.4rem; display: grid; place-items: center; font-family: var(--emoji); font-size: 1.35rem; background: var(--tint, #E3E8FB); border-radius: 2px; }
+.pop .pm { min-width: 0; flex: 1; }
+.pop .pk { font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); }
+.pop .pw { font-weight: 600; font-size: 0.9375rem; margin-top: 0.1rem; }
+.pop .pq { font-size: 1.1875rem; line-height: 1.35; margin-top: 0.3rem; overflow-wrap: anywhere; }
+.bar .unseen { display: inline-block; min-width: 1.5em; margin-left: 0.4em; padding: 0 0.35em; border-radius: 2px; background: var(--blue); color: #FFFFFF; text-align: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .pop.in { animation: popin 380ms cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+}
+@keyframes popin { from { opacity: 0; transform: translateY(16px) scale(0.98); } }
 </style>
 </head>
 <body>
@@ -504,10 +522,46 @@ button { font: inherit; color: inherit; }
       else (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
     } catch (e) {}
   }
+
+  /* ---- pop-ups for new "Ask now" questions while the questions are hidden ---- */
+  var POP_SECONDS = 60, POP_MAX = 3, unseen = 0;
+  var pops = document.createElement("div");
+  pops.className = "pops"; pops.setAttribute("aria-live", "polite");
+  $("app").insertAdjacentElement("afterend", pops);
+  function panelHidden() { return $("app").classList.contains("no-panel"); }
+  function dropPop(el) {
+    if (!el.parentNode || el.classList.contains("out")) return;
+    el.classList.add("out");
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 520);
+  }
+  function popQuestion(q) {
+    var el = h("div", { class: "pop in", title: "Click to dismiss" },
+      h("span", { class: "av", "aria-hidden": "true", text: q.emoji || "🙂" }),
+      h("div", { class: "pm" },
+        h("p", { class: "pk", text: "New question" + (q.time ? " · " + q.time : "") }),
+        h("p", { class: "pw", text: q.alias || "A guest" }),
+        h("p", { class: "pq", text: q.question })));
+    el.addEventListener("click", function () { dropPop(el); });
+    pops.appendChild(el);
+    var live = pops.querySelectorAll(".pop:not(.out)");
+    for (var i = 0; i < live.length - POP_MAX; i++) dropPop(live[i]);
+    // A pop-up stays while the mouse is over it.
+    var timer, arm = function () { clearTimeout(timer); timer = setTimeout(function () { dropPop(el); }, POP_SECONDS * 1000); };
+    el.addEventListener("mouseenter", function () { clearTimeout(timer); });
+    el.addEventListener("mouseleave", arm);
+    arm();
+  }
+  function markUnseen() {
+    var b = $("togglePanel");
+    if (!panelHidden()) { unseen = 0; b.textContent = "Hide questions"; return; }
+    b.replaceChildren(document.createTextNode("Show questions"));
+    if (unseen) b.appendChild(h("span", { class: "unseen", text: String(unseen) }));
+  }
   function togglePanel() {
     var app = $("app"), hide = !app.classList.contains("no-panel");
     app.classList.toggle("no-panel", hide);
-    $("togglePanel").textContent = hide ? "Show questions" : "Hide questions";
+    if (!hide) pops.querySelectorAll(".pop").forEach(dropPop);   // the list is back, so the pop-ups go
+    markUnseen();
     setTimeout(function () { if (P.doc) go(P.page); }, 50);
   }
 
@@ -739,7 +793,13 @@ button { font: inherit; color: inherit; }
     var waitText = !CONFIG.API_URL ? "Questions aren't connected. Paste the questions sheet link into API_URL."
       : !Q.loaded ? (Q.failed ? "Couldn't reach the questions sheet. The page keeps trying." : "Loading questions…") : null;
     // A new during-the-talk question scrolls the list back to the top, where the newest sits.
-    var newNow = Q.loaded && !first && now.some(function (q) { return Q.firstSeen[q.id] === undefined; });
+    var fresh = Q.loaded && !first ? now.filter(function (q) { return Q.firstSeen[q.id] === undefined; }) : [];
+    var newNow = fresh.length > 0;
+    // With the questions hidden, each new one pops up over the slides, oldest first.
+    if (newNow && panelHidden()) {
+      fresh.slice().reverse().forEach(function (q) { if (!q.mine) popQuestion(q); });
+      unseen += fresh.length; markUnseen();
+    }
     fill($("nowList"), now, waitText || "No questions yet. They appear here as the audience sends them.");
     if (newNow) scrollToNewest($("nowList"));
     // The end-of-talk questions appear only once they are shown to everyone.
